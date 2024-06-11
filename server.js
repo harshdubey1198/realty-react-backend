@@ -2,7 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const { MongoClient } = require('mongodb');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const session = require('express-session');
 require('dotenv').config();
 
@@ -12,7 +12,7 @@ const allowedOrigins = [
     'http://localhost:3000',
     'https://realtyshopee.com',
     // Add other allowed origins here
-  ];
+];
 const MONGODB_URL = process.env.MONGODB_URL;
 let db;
 
@@ -26,18 +26,18 @@ MongoClient.connect(MONGODB_URL, { useNewUrlParser: true, useUnifiedTopology: tr
 app.use(bodyParser.json());
 app.use(cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-  
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = 'The CORS policy for this site does not allow access from the specified origin.';
-        return callback(new Error(msg), false);
-      }
-  
-      return callback(null, true);
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified origin.';
+            return callback(new Error(msg), false);
+        }
+
+        return callback(null, true);
     },
     credentials: true
-  }));
+}));
 app.use(session({
     secret: 'secret-key',
     resave: false,
@@ -144,7 +144,6 @@ app.post('/add-property', async (req, res) => {
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
 });
-
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
