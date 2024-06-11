@@ -3,7 +3,6 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const { MongoClient } = require('mongodb');
 const bcrypt = require('bcryptjs');
-const session = require('express-session');
 require('dotenv').config();
 
 const app = express();
@@ -14,7 +13,6 @@ const allowedOrigins = [
     'https://www.realtyshopee.in',
     'https://realtyshopee.in',
     'https://realtyshopee.com',
-    // Add other allowed origins here
 ];
 const MONGODB_URL = process.env.MONGODB_URL;
 let db;
@@ -23,6 +21,8 @@ MongoClient.connect(MONGODB_URL, { useNewUrlParser: true, useUnifiedTopology: tr
     .then(client => {
         console.log('Connected to Database');
         db = client.db('RealtyShopee');
+        db.createCollection('users'); // Ensure the collection is created
+        db.createCollection('properties'); // Ensure the collection is created
     })
     .catch(error => console.error('Database Connection Error:', error));
 
@@ -41,12 +41,6 @@ app.use(cors({
     },
     credentials: true
 }));
-app.use(session({
-    secret: 'secret-key',
-    resave: false,
-    saveUninitialized: true,
-    cookie: { secure: false }
-}));
 
 app.post('/signup', async (req, res) => {
     try {
@@ -62,7 +56,6 @@ app.post('/signup', async (req, res) => {
         const newUser = { name, email, password: hashedPassword };
 
         await userCollection.insertOne(newUser);
-        req.session.user = newUser;
         res.status(200).json({ message: 'Signup successful' });
     } catch (error) {
         console.error('Signup Error:', error);
@@ -86,7 +79,6 @@ app.post('/signin', async (req, res) => {
             return res.status(400).json({ message: 'Invalid password' });
         }
 
-        req.session.user = user;
         res.status(200).json({ message: 'Signin successful', user: { name: user.name } });
     } catch (error) {
         console.error('Signin Error:', error);
@@ -94,50 +86,20 @@ app.post('/signin', async (req, res) => {
     }
 });
 
-app.get('/session', (req, res) => {
-    if (req.session.user) {
-        res.status(200).json({ user: req.session.user });
-    } else {
-        res.status(401).json({ message: 'Not authenticated' });
-    }
-});
- 
 app.post('/logout', (req, res) => {
-    req.session.destroy(err => {
-        if (err) {
-            return res.status(500).json({ message: 'Logout failed' });
-        }
-        res.status(200).json({ message: 'Logout successful' });
-    });
+    // Since session management is removed, no need for logout endpoint logic
+    res.status(200).json({ message: 'Logout successful' });
 });
 
 app.post('/add-property', async (req, res) => {
     try {
-        const { username, ...propertyData } = req.body;
-        const userCollection = db.collection('users');
+        const { ...propertyData } = req.body;
         const propertyCollection = db.collection('properties');
 
-        const user = await userCollection.findOne({ name: username });
-
-        if (!user) {
-            console.error(`User not found: ${username}`);
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        const result = await propertyCollection.insertOne({ ...propertyData, username });
+        const result = await propertyCollection.insertOne(propertyData);
 
         if (result.insertedId) {
-            const updateResult = await userCollection.updateOne(
-                { name: username },
-                { $push: { properties: result.insertedId } }
-            );
-
-            if (updateResult.modifiedCount === 1) {
-                return res.status(200).json({ message: 'Property added successfully', propertyId: result.insertedId });
-            } else {
-                console.error('Failed to update user properties');
-                return res.status(500).json({ message: 'Failed to update user properties' });
-            }
+            return res.status(200).json({ message: 'Property added successfully', propertyId: result.insertedId });
         } else {
             console.error('Failed to insert property');
             return res.status(500).json({ message: 'Failed to add property' });
@@ -146,8 +108,9 @@ app.post('/add-property', async (req, res) => {
         console.error('Add Property Error:', error);
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
+    console.log("Request Body:", req.body); // Log the request body
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, () => { 
     console.log(`Server running on http://localhost:${PORT}`);
 });
