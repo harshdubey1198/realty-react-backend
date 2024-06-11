@@ -4,7 +4,6 @@
   "description": "Web Server Made By Harsh Dubey visit https://portfolio-maharaaj.netlify.app , github : https://github.com/harshdubey1198.",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
     "server": "nodemon server.js",
     "dev": "npm run server"
