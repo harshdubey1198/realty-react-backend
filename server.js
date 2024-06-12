@@ -38,8 +38,12 @@ app.use(cors({
 }));
 
 const storage = multer.memoryStorage();
-const upload = multer({ storage });
-
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fieldSize: 25 * 1024 * 1024 // Set the maximum field size to 25MB (adjust as needed)
+  }
+});
 app.post('/signup', async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -142,7 +146,7 @@ app.get('/resale/:propertyid/:imagenumber', async (req, res) => {
         // Extract the base64 data from the image data
         const base64Data = imageData.split(';base64,').pop();
 
-        // Set the appropriate content type header 
+        // Set the appropriate content type header  
         res.setHeader('Content-Type', 'image/png'); // Assuming images are PNG format
 
         // Send the image data as the response
