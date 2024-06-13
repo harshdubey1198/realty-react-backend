@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const helmet = require('helmet');
 const multer = require('multer');
 require('dotenv').config();
+const moment = require('moment-timezone');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -179,6 +180,22 @@ app.get('/resale/:propertyid', async (req, res) => {
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
 });
+app.post('/query-form', async (req, res) => {
+    try {
+        const formData = req.body;
+        const queryCollection = db.collection('queryforms');
+        const newQuery = {
+            ...formData,
+            createdAt: moment().tz('Asia/Kolkata').format()
+        };
+        await queryCollection.insertOne(newQuery);
+        res.status(200).json({ message: 'Query submitted successfully' });
+    } catch (error) {
+        console.error('Submit Query Error:', error);
+        res.status(500).json({ message: 'An error occurred. Please try again.' });
+    }
+});
+
 
 
 app.get('/resale', async (req, res) => {
