@@ -9,13 +9,13 @@ require('dotenv').config();
 const moment = require('moment-timezone');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3009; // Use port above 1024
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
 
 const MONGODB_URL = process.env.MONGODB_URL;
 let db;
 
-MongoClient.connect(MONGODB_URL, { useNewUrlParser: true, useUnifiedTopology: true })
+MongoClient.connect(MONGODB_URL)
     .then(client => {
         console.log('Connected to Database');
         db = client.db('RealtyShopee');
@@ -45,6 +45,7 @@ const upload = multer({
     fieldSize: 25 * 1024 * 1024 // Set the maximum field size to 25MB (adjust as needed)
   }
 });
+
 app.post('/signup', async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -120,6 +121,7 @@ app.post('/add-property', upload.array('propertyimages'), async (req, res) => {
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
 });
+
 app.get('/resale/:propertyid/:imagenumber', async (req, res) => {
     try {
         const propertyId = req.params.propertyid;
@@ -180,6 +182,7 @@ app.get('/resale/:propertyid', async (req, res) => {
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
 });
+
 app.post('/query-form', async (req, res) => {
     try {
         const formData = req.body;
@@ -195,8 +198,6 @@ app.post('/query-form', async (req, res) => {
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
 });
-
-
 
 app.get('/resale', async (req, res) => {
     try {
