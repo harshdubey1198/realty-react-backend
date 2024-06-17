@@ -5,15 +5,17 @@ const { MongoClient, ObjectId } = require('mongodb');
 const bcrypt = require('bcryptjs');
 const helmet = require('helmet');
 const multer = require('multer');
-require('dotenv').config();
+const nodemailer = require('nodemailer');
 const moment = require('moment-timezone');
+require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3009; // Use port above 1024
+const PORT = process.env.PORT || 3009;
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
 
 const MONGODB_URL = process.env.MONGODB_URL;
 let db;
+let transporter;
 
 MongoClient.connect(MONGODB_URL)
     .then(client => {
@@ -23,6 +25,14 @@ MongoClient.connect(MONGODB_URL)
         db.createCollection('properties', { strict: true }).catch(() => {});
     })
     .catch(error => console.error('Database Connection Error:', error));
+
+transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.USER,
+        pass: process.env.PASS
+    }
+});
 
 app.use(helmet());
 app.use(bodyParser.json());
@@ -34,33 +44,41 @@ app.use(cors({
             return callback(new Error(msg), false);
         }
         return callback(null, true);
-    }, 
+    },
     credentials: true
 }));
 
 const storage = multer.memoryStorage();
-const upload = multer({ 
-  storage: storage,
-  limits: {
-    fieldSize: 25 * 1024 * 1024 // Set the maximum field size to 25MB (adjust as needed)
-  }
+const upload = multer({
+    storage: storage,
+    limits: {
+        fieldSize: 25 * 1024 * 1024
+    }
 });
 
+const generateTemporaryPassword = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let password = '';
+    for (let i = 0; i < 8; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+};
+
+// Authentication routes
 app.post('/signup', async (req, res) => {
     try {
         const { name, email, password } = req.body;
         const userCollection = db.collection('users');
-        const user = await userCollection.findOne({ email });
+        const userExists = await userCollection.findOne({ email });
 
-        if (user) {
+        if (userExists) {
             return res.status(400).json({ message: 'User already exists' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 12);
-        const newUser = { name, email, password: hashedPassword, properties: [] };
-
-        await userCollection.insertOne(newUser);
-        res.status(200).json({ message: 'Signup successful' });
+        await userCollection.insertOne({ name, email, password: hashedPassword });
+        res.status(201).json({ message: 'User created successfully' });
     } catch (error) {
         console.error('Signup Error:', error);
         res.status(500).json({ message: 'An error occurred. Please try again.' });
@@ -77,35 +95,94 @@ app.post('/signin', async (req, res) => {
             return res.status(400).json({ message: 'User not found' });
         }
 
-        const validPassword = await bcrypt.compare(password, user.password);
-
-        if (!validPassword) {
-            return res.status(400).json({ message: 'Invalid password' });
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        res.status(200).json({ message: 'Signin successful', user: { name: user.name } });
+        res.status(200).json({ message: 'Login successful', user });
     } catch (error) {
         console.error('Signin Error:', error);
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
 });
 
-app.post('/logout', (req, res) => {
-    res.status(200).json({ message: 'Logout successful' });
+app.post('/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        console.log('Received email:', email);
+        const userCollection = db.collection('users');
+        const user = await userCollection.findOne({ email });
+
+        if (!user) {
+            console.log('User not found for email:', email);
+            return res.status(400).json({ message: 'User not found' });
+        }
+
+        const temporaryPassword = generateTemporaryPassword();
+        console.log('Generated temporary password:', temporaryPassword);
+        const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
+
+        await userCollection.updateOne({ email }, { $set: { password: hashedPassword } });
+
+        const mailOptions = {
+            from: process.env.USER,
+            to: email,
+            subject: 'Password Reset',
+            text: `Your temporary password is: ${temporaryPassword}. Please use this password to login and reset your password immediately. https://www.realtyshopee.com/reset-password/:${temporaryPassword}.`
+        };
+
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.error('Error sending email:', error);
+                return res.status(500).json({ message: 'An error occurred while sending the email.' });
+            }
+            res.status(200).json({ message: 'Temporary password sent to your email.' });
+        });
+    } catch (error) {
+        console.error('Forgot Password Error:', error);
+        res.status(500).json({ message: 'An error occurred. Please try again.' });
+    }
 });
 
-app.post('/add-property', upload.array('propertyimages'), async (req, res) => {
+app.post('/reset-password', async (req, res) => {
+    try {
+        const { email, temporaryPassword, newPassword } = req.body;
+        const userCollection = db.collection('users');
+        const user = await userCollection.findOne({ email });
+
+        if (!user) {
+            return res.status(400).json({ message: 'User not found' });
+        }
+
+        const validPassword = await bcrypt.compare(temporaryPassword, user.password);
+
+        if (!validPassword) {
+            return res.status(400).json({ message: 'Invalid temporary password' });
+        }
+
+        const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+
+        await userCollection.updateOne({ email }, { $set: { password: hashedNewPassword } });
+
+        res.status(200).json({ message: 'Password reset successful' });
+    } catch (error) {
+        console.error('Reset Password Error:', error);
+        res.status(500).json({ message: 'An error occurred. Please try again.' });
+    }
+});
+
+// Property routes
+app.post('/property/add', upload.array('propertyimages'), async (req, res) => {
     try {
         const { username, ...propertyData } = req.body;
         const propertyCollection = db.collection('properties');
         const userCollection = db.collection('users');
 
-        // Insert the new property
         const result = await propertyCollection.insertOne(propertyData);
         const propertyId = result.insertedId;
 
         if (propertyId) {
-            // Update the user's document with the new property ID
             await userCollection.updateOne(
                 { name: username },
                 { $push: { properties: propertyId } }
@@ -122,18 +199,17 @@ app.post('/add-property', upload.array('propertyimages'), async (req, res) => {
     }
 });
 
-app.get('/resale/:propertyid/:imagenumber', async (req, res) => {
+app.get('/property/resale/:propertyid/:imagenumber', async (req, res) => {
     try {
         const propertyId = req.params.propertyid;
         const imageNumber = parseInt(req.params.imagenumber);
 
-        // Ensure propertyId is a valid ObjectId
         if (!ObjectId.isValid(propertyId)) {
             return res.status(404).json({ message: 'Invalid property ID' });
         }
 
         const propertyCollection = db.collection('properties');
-        const property = await propertyCollection.findOne({ _id: new ObjectId(propertyId) }); // Initialize ObjectId correctly
+        const property = await propertyCollection.findOne({ _id: new ObjectId(propertyId) });
 
         if (!property) {
             return res.status(404).json({ message: 'Property not found' });
@@ -146,13 +222,8 @@ app.get('/resale/:propertyid/:imagenumber', async (req, res) => {
             return res.status(404).json({ message: 'Image not found' });
         }
 
-        // Extract the base64 data from the image data
         const base64Data = imageData.split(';base64,').pop();
-
-        // Set the appropriate content type header  
-        res.setHeader('Content-Type', 'image/png'); // Assuming images are PNG format
-
-        // Send the image data as the response
+        res.setHeader('Content-Type', 'image/png');
         res.status(200).send(Buffer.from(base64Data, 'base64'));
     } catch (error) {
         console.error('Fetch Image Error:', error);
@@ -160,17 +231,16 @@ app.get('/resale/:propertyid/:imagenumber', async (req, res) => {
     }
 });
 
-app.get('/resale/:propertyid', async (req, res) => {
+app.get('/property/resale/:propertyid', async (req, res) => {
     try {
         const propertyId = req.params.propertyid;
 
-        // Ensure propertyId is a valid ObjectId
         if (!ObjectId.isValid(propertyId)) {
             return res.status(404).json({ message: 'Invalid property ID' });
         }
 
         const propertyCollection = db.collection('properties');
-        const property = await propertyCollection.findOne({ _id: new ObjectId(propertyId) }); // Initialize ObjectId correctly
+        const property = await propertyCollection.findOne({ _id: new ObjectId(propertyId) });
 
         if (!property) {
             return res.status(404).json({ message: 'Property not found' });
@@ -183,6 +253,18 @@ app.get('/resale/:propertyid', async (req, res) => {
     }
 });
 
+app.get('/property/resale', async (req, res) => {
+    try {
+        const propertyCollection = db.collection('properties');
+        const properties = await propertyCollection.find().toArray();
+        res.status(200).json({ properties });
+    } catch (error) {
+        console.error('Fetch Properties Error:', error);
+        res.status(500).json({ message: 'An error occurred. Please try again.' });
+    }
+});
+
+// Query routes
 app.post('/query-form', async (req, res) => {
     try {
         const formData = req.body;
@@ -195,17 +277,6 @@ app.post('/query-form', async (req, res) => {
         res.status(200).json({ message: 'Query submitted successfully' });
     } catch (error) {
         console.error('Submit Query Error:', error);
-        res.status(500).json({ message: 'An error occurred. Please try again.' });
-    }
-});
-
-app.get('/resale', async (req, res) => {
-    try {
-        const propertyCollection = db.collection('properties');
-        const properties = await propertyCollection.find().toArray();
-        res.status(200).json({ properties });
-    } catch (error) {
-        console.error('Fetch Properties Error:', error);
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
 });
