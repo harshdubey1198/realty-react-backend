@@ -199,7 +199,7 @@ app.post('/property/add', upload.array('propertyimages'), async (req, res) => {
     }
 });
 
-app.get('/property/resale/:propertyid/:imagenumber', async (req, res) => {
+app.get('/resale/:propertyid/:imagenumber', async (req, res) => {
     try {
         const propertyId = req.params.propertyid;
         const imageNumber = parseInt(req.params.imagenumber);
@@ -231,7 +231,7 @@ app.get('/property/resale/:propertyid/:imagenumber', async (req, res) => {
     }
 });
 
-app.get('/property/resale/:propertyid', async (req, res) => {
+app.get('/resale/:propertyid', async (req, res) => {
     try {
         const propertyId = req.params.propertyid;
 
@@ -253,7 +253,7 @@ app.get('/property/resale/:propertyid', async (req, res) => {
     }
 });
 
-app.get('/property/resale', async (req, res) => {
+app.get('/resale', async (req, res) => {
     try {
         const propertyCollection = db.collection('properties');
         const properties = await propertyCollection.find().toArray();
