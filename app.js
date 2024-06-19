@@ -23,6 +23,8 @@ MongoClient.connect(MONGODB_URL)
         db = client.db('RealtyShopee');
         db.createCollection('users', { strict: true }).catch(() => {});
         db.createCollection('properties', { strict: true }).catch(() => {});
+        db.createCollection('blogs', { strict: true }).catch(() => {});
+        db.createCollection('queryforms', { strict: true }).catch(() => {});
     })
     .catch(error => console.error('Database Connection Error:', error));
 
@@ -35,7 +37,8 @@ transporter = nodemailer.createTransport({
 });
 
 app.use(helmet());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
@@ -263,6 +266,33 @@ app.get('/resale', async (req, res) => {
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
 });
+
+// Add blogs
+app.post('/add-blogs', upload.none(), async (req, res) => {
+    try {
+        const { title, description, featureImage, descriptionImage, category, tags, username } = req.body;
+        const blogCollection = db.collection('blogs');
+
+        // Assuming descriptionImage and username are provided in the request body
+        const newBlog = {
+            title,
+            description,
+            featureImage,
+            descriptionImage,
+            category,
+            tags: tags.split(','),
+            username,
+            createdAt: new Date()
+        };
+
+        await blogCollection.insertOne(newBlog);
+        res.status(201).json({ message: 'Blog created successfully' });
+    } catch (error) {
+        console.error('Add Blog Error:', error);
+        res.status(500).json({ message: 'An error occurred. Please try again.' });
+    }
+});
+
 
 // Query routes
 app.post('/query-form', async (req, res) => {
