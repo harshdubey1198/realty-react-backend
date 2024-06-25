@@ -293,6 +293,17 @@ app.post('/add-blogs', upload.none(), async (req, res) => {
     }
 });
 
+// Blog routes
+app.get('/blogs', async (req, res) => {
+    try {
+        const blogCollection = db.collection('blogs');
+        const blogs = await blogCollection.find().toArray();
+        res.status(200).json(blogs);
+    } catch (error) {
+        console.error('Fetch Blogs Error:', error);
+        res.status(500).json({ message: 'An error occurred. Please try again.' });
+    }
+});
 
 // Query routes
 app.post('/query-form', async (req, res) => {
