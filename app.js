@@ -304,7 +304,21 @@ app.get('/blogs', async (req, res) => {
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
 });
-
+app.get('/blogs/:blogTitle', async (req, res) => {
+    try {
+        const blogTitle = req.params.blogTitle.replace(/-/g, ' ');
+        const blogCollection = db.collection('blogs');
+        const blog = await blogCollection.findOne({ title: blogTitle });
+        if (!blog) {
+            res.status(404).json({ message: 'Blog not found' });
+        } else {
+            res.status(200).json(blog);
+        }
+    } catch (error) {
+        console.error('Fetch Blog Error:', error);
+        res.status(500).json({ message: 'An error occurred. Please try again.' });
+    }
+}); 
 // Query routes
 app.post('/query-form', async (req, res) => {
     try {
