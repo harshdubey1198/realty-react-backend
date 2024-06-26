@@ -270,15 +270,17 @@ app.get('/resale', async (req, res) => {
 // Add blogs
 app.post('/add-blogs', upload.none(), async (req, res) => {
     try {
-        const { title, description, featureImage, descriptionImage, category, tags, username } = req.body;
+        const { title, description, featureImage, descriptionImages, category, tags, username } = req.body;
         const blogCollection = db.collection('blogs');
 
-        // Assuming descriptionImage and username are provided in the request body
+        // Convert descriptionImages from JSON string to array
+        const images = JSON.parse(descriptionImages);
+
         const newBlog = {
             title,
             description,
             featureImage,
-            descriptionImage,
+            descriptionImages: images,
             category,
             tags: tags.split(','),
             username,
@@ -292,6 +294,7 @@ app.post('/add-blogs', upload.none(), async (req, res) => {
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
 });
+
 
 // Blog routes
 app.get('/blogs', async (req, res) => {
