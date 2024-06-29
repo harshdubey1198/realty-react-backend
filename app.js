@@ -309,9 +309,9 @@ app.get('/blogs', async (req, res) => {
 });
 app.get('/blogs/:blogTitle', async (req, res) => {
     try {
-        const blogTitle = req.params.blogTitle.replace(/-/g, ' ');
+        const blogTitle = decodeURIComponent(req.params.blogTitle).replace(/-/g, ' ');
         const blogCollection = db.collection('blogs');
-        const blog = await blogCollection.findOne({ title: blogTitle });
+        const blog = await blogCollection.findOne({ title: { $regex: new RegExp(`^${blogTitle}$`, 'i') } });
         if (!blog) {
             res.status(404).json({ message: 'Blog not found' });
         } else {
@@ -321,7 +321,7 @@ app.get('/blogs/:blogTitle', async (req, res) => {
         console.error('Fetch Blog Error:', error);
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
-}); 
+});
 
 
 // Add CRUD routes for blogs
