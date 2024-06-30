@@ -379,16 +379,15 @@ app.get('/blogs/:id', async (req, res) => {
 app.put('/blogs/:id', upload.none(), async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, description, featureImage, descriptionImages, category, tags, username } = req.body;
+        const { title, description, featureImage, category, tags, username } = req.body;
         const blogCollection = db.collection('blogs');
 
         const updatedBlog = {
             title,
             description,
             featureImage,
-            descriptionImages: JSON.parse(descriptionImages),
             category,
-            tags: tags.split(','),
+            tags: Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim()), // Ensure tags is an array
             username,
             updatedAt: new Date()
         };
@@ -408,6 +407,7 @@ app.put('/blogs/:id', upload.none(), async (req, res) => {
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
 });
+
 
 app.delete('/blogs/:id', async (req, res) => {
     try {
