@@ -477,18 +477,31 @@ app.delete('/blogs/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const blogCollection = db.collection('blogs');
-        const result = await blogCollection.deleteOne({ _id: new ObjectId(id) });
-        if (result.deletedCount === 0) {
-            res.status(404).json({ message: 'Blog not found' });
-        } else {
-            res.status(200).json({ message: 'Blog deleted successfully' });
+        const deletedBlogCollection = db.collection('deletedBlogs');
+
+        // Find the blog to be deleted
+        const blog = await blogCollection.findOne({ _id: new ObjectId(id) });
+
+        if (!blog) {
+            return res.status(404).json({ message: 'Blog not found' });
         }
+
+        // Insert the blog into the deletedBlogs collection
+        await deletedBlogCollection.insertOne({ ...blog, deletedAt: new Date() });
+
+        // Delete the blog from the original collection
+        const result = await blogCollection.deleteOne({ _id: new ObjectId(id) });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ message: 'Blog not found' });
+        }
+
+        res.status(200).json({ message: 'Blog deleted and moved to deletedBlogs collection successfully' });
     } catch (error) {
         console.error('Delete Blog Error:', error);
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
 });
-
 // Query routes
 app.post('/query-form', async (req, res) => {
     try {
