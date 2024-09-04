@@ -5,6 +5,8 @@ const { MongoClient, ObjectId } = require('mongodb');
 const bcrypt = require('bcryptjs');
 const helmet = require('helmet');
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const nodemailer = require('nodemailer');
 const moment = require('moment-timezone');
 require('dotenv').config();
@@ -51,7 +53,20 @@ app.use(cors({
     credentials: true
 }));
 
-const storage = multer.memoryStorage();
+// const storage = multer.memoryStorage();
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadPath = path.join(__dirname, 'uploads', 'blogs');
+        // Ensure the upload directory exists
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
+});
 const upload = multer({
     storage: storage,
     limits: {
@@ -268,11 +283,72 @@ app.get('/resale', async (req, res) => {
 });
 
 // Add blogs
-app.post('/add-blogs', upload.none(), async (req, res) => {
+// app.post('/add-blogs', upload.none(), async (req, res) => {
+//     try {
+//         const {  title,
+//             description,
+//             featureImage,
+//             category,
+//             tags,
+//             meta_title,
+//             meta_description,
+//             meta_url,
+//             canonical,
+//             og_site_name,
+//             og_type,
+//             og_title,
+//             og_description,
+//             og_url,
+//             og_image,
+//             twitter_card,
+//             twitter_site,
+//             twitter_type,
+//             twitter_title,
+//             twitter_description,
+//             twitter_image } = req.body;
+//         const blogCollection = db.collection('blogs');
+
+//         // Ensure tags are converted to an array
+//         const tagsArray = tags.split(',').map(tag => tag.trim());
+
+//         const newBlog = {
+//             title,
+//             description,  // Parse JSON description
+//             featureImage,
+//             category,
+//             tags: tagsArray,
+//             meta_title,
+//             meta_description,
+//             meta_url,
+//             canonical,
+//             og_site_name,
+//             og_type,
+//             og_title,
+//             og_description,
+//             og_url,
+//             og_image,
+//             twitter_card,
+//             twitter_site,
+//             twitter_type,
+//             twitter_title,
+//             twitter_description,
+//             twitter_image,
+//             createdAt: new Date()
+//         };
+
+//         await blogCollection.insertOne(newBlog);
+//         res.status(201).json({ message: 'Blog created successfully' });
+//     } catch (error) {
+//         console.error('Add Blog Error:', error);
+//         res.status(500).json({ message: 'An error occurred. Please try again.' });
+//     }
+// });
+
+app.post('/add-blogs', upload.fields([{ name: 'featureImage', maxCount: 1 }]), async (req, res) => {
     try {
-        const {  title,
+        const {
+            title,
             description,
-            featureImage,
             category,
             tags,
             meta_title,
@@ -290,15 +366,18 @@ app.post('/add-blogs', upload.none(), async (req, res) => {
             twitter_type,
             twitter_title,
             twitter_description,
-            twitter_image } = req.body;
+            twitter_image
+        } = req.body;
+        
+        const featureImage = req.files['featureImage'] ? req.files['featureImage'][0].path : null;
         const blogCollection = db.collection('blogs');
 
         // Ensure tags are converted to an array
-        const tagsArray = tags.split(',').map(tag => tag.trim());
+        const tagsArray = tags ? tags.split(',').map(tag => tag.trim()) : [];
 
         const newBlog = {
             title,
-            description,  // Parse JSON description
+            description,  // Parse JSON description if needed
             featureImage,
             category,
             tags: tagsArray,
