@@ -3,10 +3,12 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const { MongoClient, ObjectId } = require('mongodb');
 const bcrypt = require('bcryptjs');
-const helmet = require('helmet');
+const { v2: cloudinary } = require('cloudinary');
+const CloudinaryStorage = require('multer-storage-cloudinary').CloudinaryStorage;
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const helmet = require('helmet');
 const nodemailer = require('nodemailer');
 const moment = require('moment-timezone');
 require('dotenv').config();
@@ -54,25 +56,44 @@ app.use(cors({
 }));
 
 // const storage = multer.memoryStorage();
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadPath = path.join(__dirname, 'uploads', 'blogs');
-        // Ensure the upload directory exists
-        if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
-        }
-        cb(null, uploadPath);
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname));
+// const storage = multer.diskStorage({
+//     destination: (req, file, cb) => {
+//         const uploadPath = path.join(__dirname, 'uploads', 'blogs');
+//         // Ensure the upload directory exists
+//         if (!fs.existsSync(uploadPath)) {
+//             fs.mkdirSync(uploadPath, { recursive: true });
+//         }
+//         cb(null, uploadPath);
+//     },
+//     filename: (req, file, cb) => {
+//         cb(null, Date.now() + path.extname(file.originalname));
+//     }
+// });
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Set up Cloudinary storage
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'blogs',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'gif'],
+        transformation: [{ width: 800, height: 600, crop: 'limit' }]
     }
 });
-const upload = multer({
-    storage: storage,
-    limits: {
-        fieldSize: 25 * 1024 * 1024
-    }
-});
+// const upload = multer({
+//     storage: storage,
+//     limits: {
+//         fieldSize: 25 * 1024 * 1024
+//     }
+// });
+
+const upload = multer({ storage });
+
 
 const generateTemporaryPassword = () => {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -368,7 +389,8 @@ app.post('/add-blogs', upload.fields([{ name: 'featureImage', maxCount: 1 }]), a
             twitter_description,
             twitter_image
         } = req.body;
-        
+
+        // Extract the URL of the uploaded file from Cloudinary response
         const featureImage = req.files['featureImage'] ? req.files['featureImage'][0].path : null;
         const blogCollection = db.collection('blogs');
 
@@ -407,7 +429,6 @@ app.post('/add-blogs', upload.fields([{ name: 'featureImage', maxCount: 1 }]), a
         res.status(500).json({ message: 'An error occurred. Please try again.' });
     }
 });
-
 
 
 // Blog routes
