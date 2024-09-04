@@ -527,7 +527,7 @@ app.post('/query-form', async (req, res) => {
         // Send lead notification email to the author
         const mailOptions = {
             from: process.env.USER,
-            to: 'amanad08052@gmail.com',  // Email to the author
+            to: 'sachin@realtyshopee.com',  // Email to the author
             subject: 'New Lead Received',
             html: emailTemplate
         };
